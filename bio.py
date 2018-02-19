@@ -54,14 +54,6 @@ def main():
     mu=np.zeros((Nx,Ny,Nz))
     mu[np.nonzero(mu>0)]=((headct[np.nonzero(mu>0)]-0.3)/(0.7))*(muBone-muFat)+muFat
     del headct
-    detector=np.zeros((Mx,My))
-    pos=np.zeros(3)
-    dir=np.zeros(3)
-    num_cores = multiprocessing.cpu_count()
-    inputs=range(0,Mx*My)
-    results = Parallel(n_jobs=num_cores)(delayed(sing_pixel)(i,orginOffset,ep,D,h,Nx,Ny,Nz,mu,Mx) for i in inputs)
-
-'''
     for z in range(0,Mx*My): 
         j=z%Mx
         i=int(z/Mx) 
@@ -75,7 +67,7 @@ def main():
             if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h+Nz:
                 L=L*np.exp(-1*mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist)
         detector[i][j] = L;   
-'''
+
 
 if __name__ == '__main__':
     main()
