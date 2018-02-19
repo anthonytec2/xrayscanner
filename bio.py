@@ -4,7 +4,7 @@ import math
 import matplotlib.pyplot as plt  
 from joblib import Parallel, delayed
 import multiprocessing
-
+@profile
 def onemove_in_cube_true(p0,v):
     htime=np.abs((np.floor(p0)-p0+(v>0))/v)
     minLoc=htime.argmin()
@@ -12,7 +12,7 @@ def onemove_in_cube_true(p0,v):
     htime=p0+dist*v
     htime[minLoc]=np.round(htime[minLoc])+np.spacing(np.abs(np.float64(htime[minLoc])))*np.sign(v[minLoc])
     return htime, dist
-
+@profile
 def onemove_in_cube_true_ut(p0,v):
     htime=np.abs((np.floor(p0)-p0+(v>0))/v)
     minLoc=htime.argmin()
@@ -20,7 +20,7 @@ def onemove_in_cube_true_ut(p0,v):
     htime=p0+dist*v
     htime[minLoc]=np.round(htime[minLoc])+np.spacing(np.abs(htime[minLoc]))*np.sign(v[minLoc])
     return htime, dist
-
+@profile
 def sing_pixel(z,orginOffset,ep,D,h,Nx,Ny,Nz,mu,Mx):
     j=z%Mx
     i=int(z/Mx)
@@ -32,13 +32,13 @@ def sing_pixel(z,orginOffset,ep,D,h,Nx,Ny,Nz,mu,Mx):
         if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h+Nz:
             L=L*np.exp(-1*mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist)
     return L
-
+@profile
 def main():
     Nx = 208
     Ny = 256
     Nz = 225
-    Mx = 128
-    My = 128
+    Mx = 20
+    My = 20
     D = 2
     h = 50
     H = h + Nz + 200
@@ -52,6 +52,7 @@ def main():
     f = h5py.File('headct.h5', 'r')
     headct=np.array(f.get('ct'))
     mu=np.zeros((Nx,Ny,Nz))
+    detector=np.zeros((Mx,My))
     mu[np.nonzero(mu>0)]=((headct[np.nonzero(mu>0)]-0.3)/(0.7))*(muBone-muFat)+muFat
     del headct
     for z in range(0,Mx*My): 
