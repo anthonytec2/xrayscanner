@@ -5,20 +5,11 @@ with warnings.catch_warnings():
 import numpy as np
 import math
 import matplotlib.pyplot as plt  
+import move_step
 try:
     profile  # throws an exception when profile isn't defined
 except NameError:
     profile = lambda x: x
-
-@profile
-def onemove_in_cube_true(p0,v):   
-    v[v==0]=1e-16
-    htime=np.abs((np.floor(p0)-p0+(v>0))/v,dtype='float32')
-    minLoc=htime.argmin()
-    dist=htime[minLoc]
-    htime=p0+dist*v
-    htime[minLoc]=round(htime[minLoc])+np.spacing(abs(htime[minLoc]))*np.sign(v[minLoc])
-    return htime, dist
 
 @profile
 def main():
@@ -56,11 +47,24 @@ def main():
         #print('Dir'+str(dir))
         #print('Pos'+str(pos))
         while pos[2]< h+Nz:
-            pos,dist=onemove_in_cube_true(pos,dir)
+            pos,dist=move_step.onemove_in_cube_true(pos,dir)
             if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h+Nz:
                 L=L*np.exp(-1*mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist)
         detector[i][j] = L;
     print(np.isclose(det,detector,rtol=.5).all())
+    np.save('Detector.npy',detector)
+    
+'''
+@profile
+def onemove_in_cube_true(p0,v):   
+    v[v==0]=1e-16
+    htime=np.abs((np.floor(p0)-p0+(v>0))/v,dtype='float32')
+    minLoc=htime.argmin()
+    dist=htime[minLoc]
+    htime=p0+dist*v
+    htime[minLoc]=round(htime[minLoc])+np.spacing(abs(htime[minLoc]))*np.sign(v[minLoc])
+    return htime, dist
+'''
 
 if __name__ == '__main__':
     main()
