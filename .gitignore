@@ -2,3 +2,5 @@
 *.lprof
 *.so
 build/*
+*.html
+*.npy
