@@ -1,3 +1,7 @@
 .ipynb_checkpoints/
-bio.py.lprof
-bio.py.prof
+*.lprof
+*.so
+build/*
+*.html
+*.npy
+*.json
