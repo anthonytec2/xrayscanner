@@ -5,3 +5,5 @@ build/*
 *.html
 *.npy
 *.json
+__pycache__/
+env/
