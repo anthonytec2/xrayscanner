@@ -20,7 +20,7 @@ try:
 except NameError:
     profile = lambda x: x
 
-@numba.jit
+@numba.jit(nopython=True, nogil=True, cache=True)
 def onemove_in_cube_true_numba(p0,v):   
     '''   
     This is a function that moves from a given position p0 in direction v to another cube in a 1x1x1mm setup
@@ -41,7 +41,7 @@ def onemove_in_cube_true_numba(p0,v):
     htime[minLoc]=round(htime[minLoc])+np.spacing(abs(htime[minLoc]))*np.sign(v[minLoc]) #Need this for rounding to next position
     return htime,dist
 
-@numba.jit
+@numba.jit(nopython=True, nogil=True, cache=True)
 def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
     '''
     Ray tracing from end point to all pixels, calculates energy at every pixels
