@@ -39,8 +39,8 @@ def onemove_in_cube_true_numba(p0,v):
     htime[minLoc]=round(htime[minLoc])+np.spacing(abs(htime[minLoc]))*np.sign(v[minLoc]) #Need this for rounding to next position
     return htime,dist
 
-@numba.jit(nopython=True, nogil=True, cache=True)
-def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
+@numba.jit(nopython=True, nogil=True, cache=True, parallel=True)
+def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu, detector):
     '''
     Ray tracing from end point to all pixels, calculates energy at every pixels
     Args:
@@ -57,8 +57,8 @@ def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
     Returns:
         detector: np.array 1x3 next cube position (X,Y,Z)
     '''
-    detector=np.zeros((Mx,My),dtype=np.float32) #detector Mx x pixels and My y pixels
-    for z in range(0,Mx*My): #loop for all pixels
+    
+    for z in numba.prange(Mx*My): #loop for all pixels
         j=z%Mx #y direction pixel
         i=int(z/Mx) #x direction pixel
         pos=np.array([orginOffset[0]+i*D,orginOffset[1]+D*j, 0],dtype=np.float32) #pixel location
@@ -97,7 +97,8 @@ def main():
     orginOffset = np.array([(-Mx * D) / 2 + (Nx / 2), (-My * D) / 2 +(Ny / 2), 0],dtype=np.float32) #offset from origin to detector start
     mu=np.zeros((Nx,Ny,Nz),dtype=np.float32) #(Nx,Ny,Nz) linear attenuation coeffcient matrix 
     mu[np.nonzero(headct>0)]=((headct[np.nonzero(headct>0)]-0.3)/(0.7))*(muBone-muFat)+muFat #Normilization of givens mus of linear attenuation matrix
-    detA=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu)
+    detector=np.zeros((Mx,My),dtype=np.float32) #detector Mx x pixels and My y pixels
+    detA=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu,detector)
     detector=np.exp(detA*-10,dtype=np.float64)
     print(np.count_nonzero(np.isclose(det,detector,rtol=0.01))>39900)
     np.save('Detector.npy',detector)
