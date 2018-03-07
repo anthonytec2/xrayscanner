@@ -13,7 +13,6 @@ with warnings.catch_warnings():
     import h5py
 import numpy as np
 import math
-import matplotlib.pyplot as plt  
 import numba
 try:
     profile  # throws an exception when profile isn't defined
@@ -33,7 +32,6 @@ def onemove_in_cube_true_numba(p0,v):
         dist: uint distance to the next cube position
 
     '''
-    v[v==0]=1e-16 #need this for floating point division errors in Numba
     htime=np.abs((np.floor(p0)-p0+(v>0))/v) #find distance vector to new position
     minLoc=np.argmin(htime) #find min distance location in htime
     dist=htime[minLoc] #find min distance
@@ -65,14 +63,17 @@ def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
         i=int(z/Mx) #x direction pixel
         pos=np.array([orginOffset[0]+i*D,orginOffset[1]+D*j, 0],dtype=np.float32) #pixel location
         dir=((ep-pos)/np.linalg.norm(ep-pos)).astype(np.float32) #noramlized direction vector to source
+        dir[dir==0]=1e-16 #need this for floating point division errors in Numba
         L=1 # initial energy
-        while pos[2]< h+Nz: #loop until the end of imaging volume
+        h_z=h+Nz
+        while pos[2]< h_z: #loop until the end of imaging volume
             pos,dist=onemove_in_cube_true_numba(pos,dir) #move to next cube
-            if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h+Nz: #if in imaging volume
-                L=L*np.exp(-1*mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist) #calculate energy using mu
+            if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h_z: #if in imaging volume
+                L=L*math.exp(mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist) #calculate energy using mu
         detector[i][j] = L; # detector pixel locaiton equals lasting energy
     return detector
-    
+ 
+
 @profile
 def main():
     f = h5py.File('headct.h5', 'r') #HDF5 file containing Headct array of linear attenuation coeffcients(Nx,Ny,Nz)
@@ -96,6 +97,7 @@ def main():
     orginOffset = np.array([(-Mx * D) / 2 + (Nx / 2), (-My * D) / 2 +(Ny / 2), 0],dtype=np.float32) #offset from origin to detector start
     mu=np.zeros((Nx,Ny,Nz),dtype=np.float32) #(Nx,Ny,Nz) linear attenuation coeffcient matrix 
     mu[np.nonzero(headct>0)]=((headct[np.nonzero(headct>0)]-0.3)/(0.7))*(muBone-muFat)+muFat #Normilization of givens mus of linear attenuation matrix
+    mu=mu*-10
     detector=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu) #Run through all pixels and calculate energy
     print(np.isclose(det,detector,rtol=.5).all()) #Check if result = matlab result
     np.save('Detector.npy',detector) #Save results
