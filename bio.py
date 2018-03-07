@@ -64,12 +64,12 @@ def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
         pos=np.array([orginOffset[0]+i*D,orginOffset[1]+D*j, 0],dtype=np.float32) #pixel location
         dir=((ep-pos)/np.linalg.norm(ep-pos)).astype(np.float32) #noramlized direction vector to source
         dir[dir==0]=1e-16 #need this for floating point division errors in Numba
-        L=1 # initial energy
+        L=0 # initial energy
         h_z=h+Nz
         while pos[2]< h_z: #loop until the end of imaging volume
             pos,dist=onemove_in_cube_true_numba(pos,dir) #move to next cube
             if 0 <= pos[0] < Nx and 0<=pos[1]<Ny  and h<=pos[2] < h_z: #if in imaging volume
-                L=L*math.exp(mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist) #calculate energy using mu
+                L+=mu[math.floor(pos[0]),math.floor(pos[1]),math.floor(pos[2]-h)]*dist #calculate energy using mu
         detector[i][j] = L; # detector pixel locaiton equals lasting energy
     return detector
  
@@ -97,10 +97,10 @@ def main():
     orginOffset = np.array([(-Mx * D) / 2 + (Nx / 2), (-My * D) / 2 +(Ny / 2), 0],dtype=np.float32) #offset from origin to detector start
     mu=np.zeros((Nx,Ny,Nz),dtype=np.float32) #(Nx,Ny,Nz) linear attenuation coeffcient matrix 
     mu[np.nonzero(headct>0)]=((headct[np.nonzero(headct>0)]-0.3)/(0.7))*(muBone-muFat)+muFat #Normilization of givens mus of linear attenuation matrix
-    mu=mu*-10
-    detector=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu) #Run through all pixels and calculate energy
-    print(np.isclose(det,detector,rtol=.5).all()) #Check if result = matlab result
-    np.save('Detector.npy',detector) #Save results
+    detA=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu)
+    detector=np.exp(detA*-10,dtype=np.float64)
+    print(np.count_nonzero(np.isclose(det,detector,rtol=0.01))>39900)
+    np.save('Detector.npy',detector)
 
 if __name__ == '__main__':
     main()
