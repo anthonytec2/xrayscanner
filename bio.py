@@ -7,17 +7,14 @@ a brain scan which is imaged. This code uses Numba accleration in order
 to obtain resonable imaging times. Additionally, a verifcation is placed
 to make sure this code gives them same results as a developed matlab code. 
 '''
-import warnings
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=FutureWarning)
-    import h5py
+
+import h5py
 import numpy as np
 import math
 import numba
-try:
-    profile  # throws an exception when profile isn't defined
-except NameError:
-    profile = lambda x: x
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib.pyplot import figure,colorbar,savefig,title,xlabel,ylabel,imshow, show
 
 @numba.jit(nopython=True, nogil=True, cache=True)
 def onemove_in_cube_true_numba(p0,v):   
@@ -73,22 +70,20 @@ def main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu):
         detector[i][j] = L; # detector pixel locaiton equals lasting energy
     return detector
  
-
-@profile
 def main():
     f = h5py.File('headct.h5', 'r') #HDF5 file containing Headct array of linear attenuation coeffcients(Nx,Ny,Nz)
     headct=np.array(f.get('ct'))
     headct=np.transpose(headct) #linear attenuation coeffceient matrix
-    det=f.get('det')
-    det=np.transpose(det) #Result of running this code on Matlab for later comparsion
     Nx = np.size(headct,0) #Imaging x dimension length in mm
     Ny = np.size(headct,1) #Imaging y dimension length in mm
     Nz = np.size(headct,2) #Imaging z dimension length in mm
-    Mx = 200 #Number of pixels in x direction
-    My = 200 #Number of pixels in y direction
-    D = 2 #Size of each pixel in mm
-    h = 50 #distance(Z) bettween bottom of imaging volume and detector
-    H = h + Nz + 200 #distance(Z) bettween detector and x-ray source
+    Mx = 128 #Number of pixels in x direction
+    My = 128 #Number of pixels in y direction
+    h = 2 #distance(Z) bettween bottom of imaging volume and detector
+    H = h + Nz + 600 #distance(Z) bettween detector and x-ray source
+    dx=(H*Nx)/((H-Nz-h)*Mx) #distance x direction for each pixel
+    dy=(H*Ny)/((H-Nz-h)*My) #distane y direction for each pixel
+    D = max(dx,dy) #Size of each pixel in mm
     muBone = 0.573 #linear attenuation coeffcient bone cm^-1
     muFat = 0.193 #linear attenuation coeffcient fat cm^-1
     orginOffset = np.array(
@@ -99,8 +94,13 @@ def main():
     mu[np.nonzero(headct>0)]=((headct[np.nonzero(headct>0)]-0.3)/(0.7))*(muBone-muFat)+muFat #Normilization of givens mus of linear attenuation matrix
     detA=main_loop(Nx,Ny,Nz,Mx,My,D,h,orginOffset,ep,mu)
     detector=np.exp(detA*-10,dtype=np.float64)
-    print(np.count_nonzero(np.isclose(det,detector,rtol=0.01))>39900)
-    np.save('Detector.npy',detector)
+    fig=figure()
+    imshow(np.log(detector), extent=[0, Mx, 0, My], cmap='viridis')
+    title('Detector Log Image Python')
+    xlabel('X Pixel')
+    ylabel('Y Pixel')
+    colorbar()
+    savefig('plot.png')
 
 if __name__ == '__main__':
     main()
