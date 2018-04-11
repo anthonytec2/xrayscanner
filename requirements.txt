@@ -1,0 +1,4 @@
+numba==0.37.0
+numpy==1.14.2
+matplotlib==2.2.2
+h5py==2.7.1
