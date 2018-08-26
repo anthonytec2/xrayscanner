@@ -6,7 +6,6 @@ import math
 from numba import cuda
 import pdb
 import matplotlib.pyplot as plt
-
 f = h5py.File('headct.h5', 'r')
 headct = np.array(f.get('ct'))
 headct = np.transpose(headct)  # linear attenuation coefficient matrix
@@ -36,15 +35,14 @@ mu[np.nonzero(headct > 0)] = ((headct[np.nonzero(headct > 0)] - 0.3) / (0.7)) * 
     (muBone - muFat) + muFat  # Normalization of givens mus of linear attenuation matrix
 
 
-@cuda.jit(device=True)
+@cuda.jit(device=True, debug=True)
 def onemove_in_cube_true_numba(p0, v):
-
     htime = cuda.local.array((3), dtype=numba.float32)
     for i in range(3):
         if v[i] > 0:
             htime[i] = abs((math.floor(p0[i]) - p0[i] + 1) / v[i])
         else:
-            htime[i] = abs((math.floor(p0[i]) - p0[i]) / v[i])
+            htime[i] = abs((math.floor(p0[i]) - p0[i] - 1e-4) / v[i])
     minA = 0
     minV = htime[0]
     for i in range(1, 3):
@@ -52,22 +50,23 @@ def onemove_in_cube_true_numba(p0, v):
             minA = i
             minV = htime[i]
     dist = htime[minA]
+            
     for i in range(3):
         htime[i] = p0[i] + dist * v[i]
     if v[minA] < 0:
         htime[minA] = round(htime[minA]) + 1.5e-4 * -1
     else:
         htime[minA] = round(htime[minA]) + 1.5e-4
-    return htime, dist
+    return htime, dist,minA
 
 
-@cuda.jit
-def main_loop(obj_dim, scene_info, orginOffset, ep, mu, detector):
+@cuda.jit(debug=True)
+def main_loop(obj_dim, scene_info, orginOffset, ep, mu, detector,debuga):
     i, j = cuda.grid(2)
-    print(i,j)
     if i < detector.shape[0] and j < detector.shape[1]:
         pos = cuda.local.array((3), dtype=numba.float32)
         direction = cuda.local.array((3), dtype=numba.float32)
+        dol = cuda.local.array((3), dtype=numba.float32)
         pos[0] = orginOffset[0] + i * scene_info[0]
         pos[1] = orginOffset[1] + scene_info[0] * j
         pos[2] = 0
@@ -75,27 +74,28 @@ def main_loop(obj_dim, scene_info, orginOffset, ep, mu, detector):
         x = cuda.threadIdx.x
         bx = cuda.blockIdx.x
         bdx = cuda.blockDim.x
-
+       
         for k in range(3):
             norm += math.pow(ep[k]-pos[k], 2)
         norm = math.sqrt(norm)
-
         for k in range(3):
             direction[k] = (ep[k]-pos[k])/norm
             if direction[k] == 0:
                 direction[k] = 1e-16
         L = 0
         h_z = scene_info[1] + obj_dim[2]
+        zz=0
         while pos[2] < h_z:
-            if i == 3 and j == 2:
-                a=0
-                #print(pos[0],pos[1], pos[2], direction[0], direction[1], direction[2])
-            pos, dist = onemove_in_cube_true_numba(pos, direction)
+            if zz>5000:   
+                break   
+            p1, dist, minA = onemove_in_cube_true_numba(pos, direction)
+            for k in range(3):
+                pos[k]=p1[k]
             if 0 <= pos[0] < obj_dim[0] and 0 <= pos[1] < obj_dim[1] and scene_info[1] <= pos[2] < h_z:
                 L += mu[int(math.floor(pos[0])), int(math.floor(pos[1])),
                         int(math.floor(pos[2] - scene_info[1]))] * dist
+            zz+=1
         detector[i][j] = L
-
 
 stream = cuda.stream()
 h_detector = np.zeros((Mx, My), dtype=np.float32)
@@ -107,12 +107,15 @@ h_scene_info = np.array([D, h])
 d_scene_info = cuda.to_device(h_scene_info, stream)
 d_ep = cuda.to_device(ep, stream)
 d_orginOffset = cuda.to_device(orginOffset, stream)
+h_debug=np.zeros((5000,3), dtype=np.float32)
+d_debug=cuda.to_device(h_debug, stream)
 stream.synchronize()
-main_loop[(8, 8), (32, 32), stream](d_obj_dim, d_scene_info, d_orginOffset, d_ep, d_mu, d_detector)
+main_loop[(20, 20), (8, 8), stream](d_obj_dim, d_scene_info, d_orginOffset, d_ep, d_mu, d_detector, d_debug)
 stream.synchronize()
 res = d_detector.copy_to_host()
-#print(res)
+res2= d_debug.copy_to_host()
 det2 = np.exp(res * -10, dtype=np.float64)
+
 plt.imshow(np.log(det2))
-plt.show()
-a=0
+plt.savefig('image.png')
+#plt.show()
