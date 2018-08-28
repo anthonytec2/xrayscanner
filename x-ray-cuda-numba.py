@@ -1,10 +1,8 @@
 import h5py
 import numpy as np
 import numba
-import timeit
 import math
 from numba import cuda
-import pdb
 import matplotlib.pyplot as plt
 f = h5py.File('headct.h5', 'r')
 headct = np.array(f.get('ct'))
@@ -34,7 +32,6 @@ mu = np.zeros((Nx, Ny, Nz), dtype=np.float32)
 mu[np.nonzero(headct > 0)] = ((headct[np.nonzero(headct > 0)] - 0.3) / (0.7)) * \
     (muBone - muFat) + muFat  # Normalization of givens mus of linear attenuation matrix
 
-
 @cuda.jit(device=True, debug=True)
 def onemove_in_cube_true_numba(p0, v):
     htime = cuda.local.array((3), dtype=numba.float32)
@@ -57,65 +54,53 @@ def onemove_in_cube_true_numba(p0, v):
         htime[minA] = round(htime[minA]) + 1.5e-4 * -1
     else:
         htime[minA] = round(htime[minA]) + 1.5e-4
-    return htime, dist,minA
+    return htime, dist
 
 
 @cuda.jit(debug=True)
-def main_loop(obj_dim, scene_info, orginOffset, ep, mu, detector,debuga):
+def main_loop(h_image_params, mu, detector):
     i, j = cuda.grid(2)
     if i < detector.shape[0] and j < detector.shape[1]:
         pos = cuda.local.array((3), dtype=numba.float32)
         direction = cuda.local.array((3), dtype=numba.float32)
-        dol = cuda.local.array((3), dtype=numba.float32)
-        pos[0] = orginOffset[0] + i * scene_info[0]
-        pos[1] = orginOffset[1] + scene_info[0] * j
+        pos[0] = h_image_params[8] + h_image_params[3] * numba.float32(i)
+        pos[1] = h_image_params[9] + h_image_params[3] * numba.float32(j)
         pos[2] = 0
         norm = 0
-        x = cuda.threadIdx.x
-        bx = cuda.blockIdx.x
-        bdx = cuda.blockDim.x
-       
         for k in range(3):
-            norm += math.pow(ep[k]-pos[k], 2)
+            norm += math.pow(h_image_params[5+k]-pos[k], 2)
         norm = math.sqrt(norm)
         for k in range(3):
-            direction[k] = (ep[k]-pos[k])/norm
+            direction[k] = (h_image_params[5+k]-pos[k])/norm
             if direction[k] == 0:
                 direction[k] = 1e-16
         L = 0
-        h_z = scene_info[1] + obj_dim[2]
-        zz=0
-        while pos[2] < h_z:
-            if zz>5000:   
-                break   
-            p1, dist, minA = onemove_in_cube_true_numba(pos, direction)
+        h_z = h_image_params[4] + h_image_params[2]
+        while pos[2] < h_z: 
+            if -.0001<pos[0]<.0001:
+                pos[0]+=.0001
+            if -.0001<pos[1]<.0001:
+                pos[1]+=.0001  
+            p1, dist = onemove_in_cube_true_numba(pos, direction)
             for k in range(3):
                 pos[k]=p1[k]
-            if 0 <= pos[0] < obj_dim[0] and 0 <= pos[1] < obj_dim[1] and scene_info[1] <= pos[2] < h_z:
+            if 0 <= pos[0] < h_image_params[0] and 0 <= pos[1] < h_image_params[1] and h_image_params[4] <= pos[2] < h_z:
                 L += mu[int(math.floor(pos[0])), int(math.floor(pos[1])),
-                        int(math.floor(pos[2] - scene_info[1]))] * dist
-            zz+=1
+                        int(math.floor(pos[2] - h_image_params[4]))] * dist
         detector[i][j] = L
-
+  
+        
+        
 stream = cuda.stream()
-h_detector = np.zeros((Mx, My), dtype=np.float32)
-d_detector = cuda.to_device(h_detector, stream)
+h_image_params = np.array([Nx, Ny, Nz, D, h, ep[0],ep[1], ep[2], orginOffset[0], orginOffset[1], orginOffset[2]], dtype=np.float32)
+d_detector=cuda.device_array((Mx, My), dtype=np.float32, stream=stream)
 d_mu = cuda.to_device(mu, stream)
-h_obj_dim = np.array([Nx, Ny, Nz])
-d_obj_dim = cuda.to_device(h_obj_dim, stream)
-h_scene_info = np.array([D, h])
-d_scene_info = cuda.to_device(h_scene_info, stream)
-d_ep = cuda.to_device(ep, stream)
-d_orginOffset = cuda.to_device(orginOffset, stream)
-h_debug=np.zeros((5000,3), dtype=np.float32)
-d_debug=cuda.to_device(h_debug, stream)
+d_image_params = cuda.to_device(h_image_params, stream)
 stream.synchronize()
-main_loop[(20, 20), (8, 8), stream](d_obj_dim, d_scene_info, d_orginOffset, d_ep, d_mu, d_detector, d_debug)
+main_loop[(int(np.ceil(Mx/25)), int(np.ceil(My/25))), (25, 25), stream](h_image_params, d_mu, d_detector)
 stream.synchronize()
 res = d_detector.copy_to_host()
-res2= d_debug.copy_to_host()
 det2 = np.exp(res * -10, dtype=np.float64)
-
 plt.imshow(np.log(det2))
 plt.savefig('image.png')
-#plt.show()
+print('Done')

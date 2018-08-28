@@ -17,7 +17,7 @@ matplotlib.use('Agg')
 from matplotlib.pyplot import figure, colorbar, savefig, title, xlabel, ylabel, imshow
 
 
-@numba.jit(nopython=True, nogil=True, cache=True)
+# @numba.jit(nopython=True, nogil=True, cache=True)
 def onemove_in_cube_true_numba(p0, v):
     '''
     This is a function that moves from a given position p0 in direction v to another cube in a 1x1x1mm setup
@@ -30,8 +30,8 @@ def onemove_in_cube_true_numba(p0, v):
         dist: uint distance to the next cube position
 
     '''
-    htime = np.abs((np.floor(p0) - p0 + (v > 0)) /
-                   v)  # find distance vector to new position
+
+    htime = np.abs((np.floor(p0) - p0 + (v > 0)) / v)  # find distance vector to new position
     minLoc = np.argmin(htime)  # find min distance location in htime
     dist = htime[minLoc]  # find min distance
     htime = p0 + dist * v  # calculate new position estimate htime
@@ -41,7 +41,8 @@ def onemove_in_cube_true_numba(p0, v):
     return htime, dist
 
 
-@numba.jit(nopython=True, nogil=True, cache=True)
+# @numba.jit(nopython=True, nogil=True, cache=True)
+@profile
 def main_loop(Nx, Ny, Nz, Mx, My, D, h, orginOffset, ep, mu):
     '''
     Ray tracing from end point to all pixels, calculates energy at every pixels
@@ -112,7 +113,8 @@ def main():
     # (Nx,Ny,Nz) linear attenuation coefficient matrix
     mu = np.zeros((Nx, Ny, Nz), dtype=np.float32)
     mu[np.nonzero(headct > 0)] = ((headct[np.nonzero(headct > 0)] - 0.3) / (0.7)) * \
-        (muBone - muFat) + muFat  # Normalization of givens mus of linear attenuation matrix
+        (muBone - muFat) + \
+        muFat  # Normalization of givens mus of linear attenuation matrix
     detA = main_loop(Nx, Ny, Nz, Mx, My, D, h, orginOffset, ep, mu)
     detector = np.exp(detA * -10, dtype=np.float64)
     fig = figure()
