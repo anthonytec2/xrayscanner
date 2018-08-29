@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt  # plotting library
 
 @cuda.jit(device=True)  # CUDA Device function must be called from GPU kernel
 def onemove_in_cube_true_numba(p0, v):
-     '''
+    '''
     This is a function that moves from a given position p0 in direction v to another cube in a 1x1x1mm setup
     Args:
         p0: np.array 1x3 start position (X,Y,Z)
@@ -29,7 +29,6 @@ def onemove_in_cube_true_numba(p0, v):
 
     '''
     htime = cuda.local.array((3), dtype=numba.float32) #Create local CUDA array to each thread to store next position
- 
     for i in range(3): #loop through dim to calc time to next pos
         if v[i] > 0: #if positive need to add 1 to reverse negative result
             htime[i] = abs((math.floor(p0[i]) - p0[i] + 1) / v[i])
@@ -53,7 +52,7 @@ def onemove_in_cube_true_numba(p0, v):
 
 @cuda.jit # GPU Kernel must be executed from host
 def main_loop(h_image_params, mu, detector):
-     '''
+    '''
     Ray tracing from end point to all pixels, calculates energy at every pixels
     Args:
         h_image_params:
@@ -144,6 +143,10 @@ def main():
     res = d_detector.copy_to_host() # Transfer detector image to host
     det2 = np.exp(res * -10, dtype=np.float64) # Perform necessary rescaling 
     plt.imshow(np.log(det2)) # Plot result
+    plt.title('Detector Log Image Python')
+    plt.xlabel('X Pixel')
+    plt.ylabel('Y Pixel')
+    plt.colorbar()
     plt.savefig('x-ray.png') # Save Figure
     print('Done') # print finshed
 
