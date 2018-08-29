@@ -4,8 +4,7 @@ February 26th, 2018
 This is a script to run an imaging scenario on a given imaging volume
 with an arbitrary sized detector. Currently, the file that loads is
 a brain scan which is imaged. This code uses Numba acceleration in order
-to obtain reasonable imaging times. Additionally, a verification is placed
-to make sure this code gives them same results as a developed matlab code.
+to obtain reasonable imaging times.
 '''
 
 import h5py
@@ -17,7 +16,7 @@ matplotlib.use('Agg')
 from matplotlib.pyplot import figure, colorbar, savefig, title, xlabel, ylabel, imshow
 
 
-# @numba.jit(nopython=True, nogil=True, cache=True)
+@numba.jit(nopython=True, nogil=True, cache=True)
 def onemove_in_cube_true_numba(p0, v):
     '''
     This is a function that moves from a given position p0 in direction v to another cube in a 1x1x1mm setup
@@ -27,11 +26,12 @@ def onemove_in_cube_true_numba(p0, v):
 
     Returns:
         htime: np.array 1x3 next cube position (X,Y,Z)
-        dist: uint distance to the next cube position
+        dist: float distance to the next cube position
 
     '''
 
-    htime = np.abs((np.floor(p0) - p0 + (v > 0)) / v)  # find distance vector to new position
+    # find distance vector to new position
+    htime = np.abs((np.floor(p0) - p0 + (v > 0)) / v)
     minLoc = np.argmin(htime)  # find min distance location in htime
     dist = htime[minLoc]  # find min distance
     htime = p0 + dist * v  # calculate new position estimate htime
@@ -41,8 +41,7 @@ def onemove_in_cube_true_numba(p0, v):
     return htime, dist
 
 
-# @numba.jit(nopython=True, nogil=True, cache=True)
-@profile
+@numba.jit(nopython=True, nogil=True, cache=True)
 def main_loop(Nx, Ny, Nz, Mx, My, D, h, orginOffset, ep, mu):
     '''
     Ray tracing from end point to all pixels, calculates energy at every pixels
