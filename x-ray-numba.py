@@ -4,8 +4,7 @@ February 26th, 2018
 This is a script to run an imaging scenario on a given imaging volume
 with an arbitrary sized detector. Currently, the file that loads is
 a brain scan which is imaged. This code uses Numba acceleration in order
-to obtain reasonable imaging times. Additionally, a verification is placed
-to make sure this code gives them same results as a developed matlab code.
+to obtain reasonable imaging times.
 '''
 
 import h5py
@@ -27,11 +26,12 @@ def onemove_in_cube_true_numba(p0, v):
 
     Returns:
         htime: np.array 1x3 next cube position (X,Y,Z)
-        dist: uint distance to the next cube position
+        dist: float distance to the next cube position
 
     '''
-    htime = np.abs((np.floor(p0) - p0 + (v > 0)) /
-                   v)  # find distance vector to new position
+
+    # find distance vector to new position
+    htime = np.abs((np.floor(p0) - p0 + (v > 0)) / v)
     minLoc = np.argmin(htime)  # find min distance location in htime
     dist = htime[minLoc]  # find min distance
     htime = p0 + dist * v  # calculate new position estimate htime
@@ -112,7 +112,8 @@ def main():
     # (Nx,Ny,Nz) linear attenuation coefficient matrix
     mu = np.zeros((Nx, Ny, Nz), dtype=np.float32)
     mu[np.nonzero(headct > 0)] = ((headct[np.nonzero(headct > 0)] - 0.3) / (0.7)) * \
-        (muBone - muFat) + muFat  # Normalization of givens mus of linear attenuation matrix
+        (muBone - muFat) + \
+        muFat  # Normalization of givens mus of linear attenuation matrix
     detA = main_loop(Nx, Ny, Nz, Mx, My, D, h, orginOffset, ep, mu)
     detector = np.exp(detA * -10, dtype=np.float64)
     fig = figure()
